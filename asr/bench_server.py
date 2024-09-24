@@ -10,7 +10,7 @@ def send_post_request(url: str, file_path: str, lang: str | None) -> tuple[int, 
     # prepare payload
     with open(file_path, 'rb') as f:
         # prepare payload
-        payload = {'lang': lang}
+        payload = {'language': lang}
 
         # start time
         start_time = time.time()
