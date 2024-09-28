@@ -24,7 +24,7 @@ def check_cuda() -> bool:
         print("[INSTALL] Checking if GPU and CUDA toolkit...")
         subprocess.run("nvidia-smi", cwd=None, check=True, text=True)
         print("[INSTALL] Has GPU")
-        subprocess.run("nvcc", "--version", cwd=None, check=True, text=True)
+        subprocess.run(["nvcc", "--version"], cwd=None, check=True, text=True)
         print("[INSTALL] Has CUDA toolkit")
         return True
     except Exception:
@@ -34,7 +34,7 @@ def check_cuda() -> bool:
 def install_dependencies() -> None:
     print("[INSTALL] Updating and upgrading system packages...")
     run_command(["sudo", "apt", "update"])
-    run_command(["sudo", "apt", "upgrade", "-y"])
+    # run_command(["sudo", "apt", "upgrade", "-y"])
     
     print("[INSTALL] Installing necessary packages...")
     run_command(["sudo", "apt", "install", "ccache", "pkg-config", "ffmpeg", "build-essential", "make", "gcc", "-y"])
