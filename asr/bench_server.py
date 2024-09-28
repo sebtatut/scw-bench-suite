@@ -4,7 +4,7 @@ import argparse
 import math
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# function to measure request time and send file
+# send and measure request completion time
 def send_post_request(url: str, file_path: str, lang: str | None) -> tuple[int, float]:
     # open the file in binary mode
     # prepare payload
@@ -14,8 +14,9 @@ def send_post_request(url: str, file_path: str, lang: str | None) -> tuple[int, 
 
         # start time
         start_time = time.time()
-        # send POST request with file as payload
+
         response = requests.post(url, data=payload, files={'file': f})
+        
         # end time
         end_time = time.time()
     
@@ -45,8 +46,11 @@ def calculate_mean(data: list[float]) -> float:
 # calculate standard deviation
 def calculate_std_dev(data: list[float], mean: float) -> float:
     print(f"data: {data}\tmean: {mean}")
-    # use len(data) - 1 for sample standard deviation
-    variance = sum((x - mean) ** 2 for x in data) / (len(data) - 1)
+    # use num_samples - 1 for sample standard deviation
+    num_samples = len(data)
+    if num_samples == 1:
+        return 0
+    variance = sum((x - mean) ** 2 for x in data) / (num_samples - 1)
     return math.sqrt(variance)
 
 # calculate RTF
@@ -80,6 +84,7 @@ def run_benchmark_for_server(url: str, file_path: str, lang: str | None, request
                 else:
                     print(f"Request failed with status code {status_code}")
     
+    # TODO add succesful/failed requests count
     return results
 
 # run benchmark for multiple servers concurrently
@@ -90,7 +95,12 @@ def run_benchmark(urls: list[str], file_path: str, lang: str | None, clip_length
     rtf_per_iteration = []
     total_requests_processed = 0
 
-    per_server_requests = math.ceil(requests / len(urls))  # distribute requests across servers
+    num_servers = len(urls)
+    base_requests_per_server = requests // num_servers
+    remainder_requests = requests % num_servers
+
+    # distribute requests across servers
+    per_server_requests = math.ceil(requests / num_servers)
     
     for _ in range(iterations):
         iteration_results = []
@@ -99,8 +109,12 @@ def run_benchmark(urls: list[str], file_path: str, lang: str | None, clip_length
         iteration_start_time = time.time()
 
         with ThreadPoolExecutor(max_workers=len(urls)) as server_executor:
-            # submit tasks for each server
-            server_futures = [server_executor.submit(run_benchmark_for_server, url, file_path, lang, per_server_requests, request_rate) for url in urls]
+            server_futures = []
+            for i, url in enumerate(urls):
+                # distribute the remainder requests among the first few servers
+                server_requests = base_requests_per_server + (1 if i < remainder_requests else 0)
+                print(f'Distributed {server_requests} requests to server {url}')
+                server_futures.append(server_executor.submit(run_benchmark_for_server, url, file_path, lang, server_requests, request_rate))
 
             # collect the results from all servers
             for server_future in as_completed(server_futures):
@@ -130,7 +144,7 @@ def run_benchmark(urls: list[str], file_path: str, lang: str | None, clip_length
 
     return mean_processing_times_per_iteration, median_per_iteration, p99_per_iteration, rtf_per_iteration, total_requests_processed
 
-# generate statistics and print results in a simple table
+# gen statistics and print results
 def print_statistics(mean_times: list[float], median_times: list[float], p99_times: list[float], rtfs: list[float], total_requests: int, total_elapsed_time: float, num_servers: int, iterations: int) -> None:
     # mean processing time and its standard deviation
     mean_time_across_iterations = calculate_mean(mean_times)
@@ -144,7 +158,7 @@ def print_statistics(mean_times: list[float], median_times: list[float], p99_tim
     # P99 processing time
     p99_across_iterations = calculate_p99(p99_times)
 
-    # mean RTF and its standard deviation
+    # mean RTF and std dev
     mean_rtf = calculate_mean(rtfs)
     std_dev_rtf = calculate_std_dev(rtfs, mean_rtf)
     # std dev %
