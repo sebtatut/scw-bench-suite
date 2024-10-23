@@ -216,6 +216,7 @@ def run_benchmark(urls: list[str], file_path: str, lang: str | None, requests: i
     # init results 
     iterations_ptimes: list[float] = []
     iterations_rtfs: list[float] = []
+    total_clip_dur_s: float = 0.0
     total_requests_processed = 0
 
     # distribute requests across servers
@@ -261,10 +262,9 @@ def run_benchmark(urls: list[str], file_path: str, lang: str | None, requests: i
         # accumulate num failed requests
         failed_requests_num = len(iteration_results) - len(ptimes)
    
-        # calculate total transcribed duration, if request was successful
-        total_clip_dur_s: float = 0.0
+        # accumulate transcribed duration, if request was successful
         if ptimes:
-            total_clip_dur_s = sum([durations_ms[i] / 1000 for i, result in enumerate(iteration_results) if result['status'] == 200])
+            total_clip_dur_s += sum([durations_ms[i] / 1000 for i, result in enumerate(iteration_results) if result['status'] == 200])
 
     # gather results
     results: dict[str, list[float] | int] = {
