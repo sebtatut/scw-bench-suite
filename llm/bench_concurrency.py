@@ -40,11 +40,12 @@ def collect_metrics(args: argparse.Namespace) -> Dict[int, Dict[str, float]]:
         for _ in range(args.runs):
             # run bench
             cmd: List[str] = [
-                "python3", "/repos/vllm/benchmarks/benchmark_serving.py",
+                "python3", "./benchmark_serving.py",
                 "--backend", args.backend,
                 "--dataset-name", args.dataset_name,
                 "--model", args.model,
                 "--num-prompts", str(concurrency_level),
+                "--base-url", args.base_url,
                 "--endpoint", args.endpoint,
                 "--tokenizer", args.tokenizer,
                 "--random-input-len", str(args.random_input_len),
@@ -238,6 +239,7 @@ def main() -> None:
     parser.add_argument("--backend", required=True, help="Backend name (e.g., vllm)")
     parser.add_argument("--dataset-name", required=True, help="Dataset name (e.g., random)")
     parser.add_argument("--model", required=True, help="Model name (e.g., meta-llama/Llama-3.1-8B-Instruct)")
+    parser.add_argument("--base-url", required=True, help="Base URL")
     parser.add_argument("--endpoint", required=True, help="Endpoint URL")
     parser.add_argument("--tokenizer", required=True, help="Tokenizer name")
     parser.add_argument("--random-input-len", type=int, default=4096, help="Random input length")
