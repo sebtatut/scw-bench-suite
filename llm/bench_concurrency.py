@@ -1,3 +1,4 @@
+from datetime import datetime
 import os
 import subprocess
 import re
@@ -16,10 +17,10 @@ def parse_output(output: str) -> Dict[str, float]:
             raise ValueError(f"Expected pattern '{pattern}' not found in output.")
 
     metrics = {
-        'Output token throughput': extract_metric(r"Output token throughput \(tok/s\):\s+([\d.]+)"),
-        'Median TTFT': extract_metric(r"Median TTFT \(ms\):\s+([\d.]+)"),
-        'Median TPOT': extract_metric(r"Median TPOT \(ms\):\s+([\d.]+)"),
-        'Median ITL': extract_metric(r"Median ITL \(ms\):\s+([\d.]+)")
+        'Output token throughput (tok/s)': extract_metric(r"Output token throughput \(tok/s\):\s+([\d.]+)"),
+        'Median TTFT (ms)': extract_metric(r"Median TTFT \(ms\):\s+([\d.]+)"),
+        'Median TPOT (ms)': extract_metric(r"Median TPOT \(ms\):\s+([\d.]+)"),
+        'Median ITL (ms)': extract_metric(r"Median ITL \(ms\):\s+([\d.]+)")
     }
     return metrics
 
@@ -30,10 +31,10 @@ def collect_metrics(args: argparse.Namespace) -> Dict[int, Dict[str, float]]:
 
     for concurrency_level in range(args.concurrency_level_start, args.concurrency_level_end + 1):
         metrics_per_run: Dict[str, List[float]] = {
-            'Output token throughput': [],
-            'Median TTFT': [],
-            'Median TPOT': [],
-            'Median ITL': []
+            'Output token throughput (tok/s)': [],
+            'Median TTFT (ms)': [],
+            'Median TPOT (ms)': [],
+            'Median ITL (ms)': []
         }
 
         for _ in range(args.runs):
@@ -74,15 +75,27 @@ def collect_metrics(args: argparse.Namespace) -> Dict[int, Dict[str, float]]:
 
     return all_results
 
-def plot_metrics(results: Dict[int, Dict[str, float]], save_plot: Optional[str] = None, plot_dim: Optional[Tuple[int, int]] = None) -> None:
+def generate_subtitle(args: argparse.Namespace) -> str:
+    """Generates subtitle text with model, input length, and output length details."""
+    return f"Model: {args.model} | Input Length: {args.random_input_len} | Output Length: {args.random_output_len}"
+
+def save_plot_to_file(plot_type: str, format: str) -> None:
+    """Saves the current plot to a file."""
+    current_dir = os.getcwd()
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S") # type: ignore
+    save_path = f"{current_dir}/{timestamp}_benchmark_metrics_{plot_type}.{format.lower()}"
+    print(f"Saving plot to: {save_path}")
+    plt.savefig(save_path, format=format.lower(), dpi=100) # type: ignore
+
+def plot_metrics(args: argparse.Namespace, results: Dict[int, Dict[str, float]], save_plot: Optional[str] = None, plot_dim: Optional[Tuple[int, int]] = None) -> None:
     """Plots the metrics using the memorized plotting procedure."""
     
     # extract concurrency levels and metrics for plotting
     concurrency_levels = list(results.keys())
-    output_token_throughput = [results[level]['Output token throughput'] for level in concurrency_levels]
-    median_ttft = [results[level]['Median TTFT'] for level in concurrency_levels]
-    median_tpot = [results[level]['Median TPOT'] for level in concurrency_levels]
-    median_itl = [results[level]['Median ITL'] for level in concurrency_levels]
+    output_token_throughput = [results[level]['Output token throughput (tok/s)'] for level in concurrency_levels]
+    median_ttft = [results[level]['Median TTFT (ms)'] for level in concurrency_levels]
+    median_tpot = [results[level]['Median TPOT (ms)'] for level in concurrency_levels]
+    median_itl = [results[level]['Median ITL (ms)'] for level in concurrency_levels]
 
     # normalize each metric list to improve visibility on a common scale
     metrics = [output_token_throughput, median_ttft, median_tpot, median_itl]
@@ -105,6 +118,7 @@ def plot_metrics(results: Dict[int, Dict[str, float]], save_plot: Optional[str] 
     plt.xlabel('Concurrency Level') # type: ignore
     plt.ylabel('Normalized Metrics') # type: ignore
     plt.title('Normalized Benchmark Metrics by Concurrency Level') # type: ignore
+    plt.figtext(0.5, 0.95, generate_subtitle(args), ha='center', fontsize=10, color='gray') # type: ignore
     
     # legend and grid
     plt.legend() # type: ignore
@@ -112,23 +126,20 @@ def plot_metrics(results: Dict[int, Dict[str, float]], save_plot: Optional[str] 
 
     # save | display the plot
     if save_plot:
-        current_dir = os.getcwd()
-        save_path = f"{current_dir}/benchmark_metrics.{save_plot.lower()}"
-        print(f"Saving plot to: {save_path}")
-        plt.savefig(save_path, format=save_plot.lower(), dpi=100) # type: ignore
+        save_plot_to_file("combined", save_plot)
     else:
         plt.show() # type: ignore
 
 
-def plot_metrics_trellis(results: Dict[int, Dict[str, float]], save_plot: Optional[str] = None, plot_dim: Optional[Tuple[int, int]] = None) -> None:
+def plot_metrics_trellis(args: argparse.Namespace, results: Dict[int, Dict[str, float]], save_plot: Optional[str] = None, plot_dim: Optional[Tuple[int, int]] = None) -> None:
     """Plots the metrics using a trellis of bar charts with trend lines."""
     
     # extract concurrency levels and metrics for plotting
     concurrency_levels = list(results.keys())
-    output_token_throughput = [results[level]['Output token throughput'] for level in concurrency_levels]
-    median_ttft = [results[level]['Median TTFT'] for level in concurrency_levels]
-    median_tpot = [results[level]['Median TPOT'] for level in concurrency_levels]
-    median_itl = [results[level]['Median ITL'] for level in concurrency_levels]
+    output_token_throughput = [results[level]['Output token throughput (tok/s)'] for level in concurrency_levels]
+    median_ttft = [results[level]['Median TTFT (ms)'] for level in concurrency_levels]
+    median_tpot = [results[level]['Median TPOT (ms)'] for level in concurrency_levels]
+    median_itl = [results[level]['Median ITL (ms)'] for level in concurrency_levels]
     
     # setup figure dimensions
     fig_size = (plot_dim[0] / 100, plot_dim[1] / 100) if plot_dim else (14, 10)
@@ -137,10 +148,10 @@ def plot_metrics_trellis(results: Dict[int, Dict[str, float]], save_plot: Option
 
     # map metric to its respective position in the grid
     metrics_data = { # type: ignore
-        'Output Token Throughput': {'values': output_token_throughput, 'color': 'red', 'axis': axes[0]},
-        'Median TTFT': {'values': median_ttft, 'color': 'blue', 'axis': axes[1]},
-        'Median TPOT': {'values': median_tpot, 'color': 'green', 'axis': axes[2]},
-        'Median ITL': {'values': median_itl, 'color': 'purple', 'axis': axes[3]}
+        'Output Token Throughput (tok/s)': {'values': output_token_throughput, 'color': 'red', 'axis': axes[0]},
+        'Median TTFT (ms)': {'values': median_ttft, 'color': 'blue', 'axis': axes[1]},
+        'Median TPOT (ms)': {'values': median_tpot, 'color': 'green', 'axis': axes[2]},
+        'Median ITL (ms)': {'values': median_itl, 'color': 'purple', 'axis': axes[3]}
     }
 
     # create bar charts with trend lines for each metric
@@ -163,26 +174,24 @@ def plot_metrics_trellis(results: Dict[int, Dict[str, float]], save_plot: Option
 
     # setup layout
     plt.suptitle("Benchmark Metrics by Concurrency Level", fontsize=16) # type: ignore
+    plt.figtext(0.5, 0.95, generate_subtitle(args), ha='center', fontsize=10, color='gray') # type: ignore
     plt.tight_layout(rect=[0, 0.03, 1, 0.95]) # type: ignore
     
     if save_plot:
-        current_dir = os.getcwd()
-        save_path = f"{current_dir}/benchmark_metrics_trellis.{save_plot.lower()}"
-        print(f"Saving plot to: {save_path}")
-        plt.savefig(save_path, format=save_plot.lower(), dpi=100) # type: ignore
+        save_plot_to_file("trellis", save_plot)
     else:
         plt.show() # type: ignore
 
 
-def plot_metrics_trellis_line_only(results: Dict[int, Dict[str, float]], save_plot: Optional[str] = None, plot_dim: Optional[Tuple[int, int]] = None) -> None:
+def plot_metrics_trellis_line_only(args: argparse.Namespace, results: Dict[int, Dict[str, float]], save_plot: Optional[str] = None, plot_dim: Optional[Tuple[int, int]] = None) -> None:
     """Plots the metrics using a trellis of line charts only."""
     
     # extract concurrency levels and metrics for plotting
     concurrency_levels = list(results.keys())
-    output_token_throughput = [results[level]['Output token throughput'] for level in concurrency_levels]
-    median_ttft = [results[level]['Median TTFT'] for level in concurrency_levels]
-    median_tpot = [results[level]['Median TPOT'] for level in concurrency_levels]
-    median_itl = [results[level]['Median ITL'] for level in concurrency_levels]
+    output_token_throughput = [results[level]['Output token throughput (tok/s)'] for level in concurrency_levels]
+    median_ttft = [results[level]['Median TTFT (ms)'] for level in concurrency_levels]
+    median_tpot = [results[level]['Median TPOT (ms)'] for level in concurrency_levels]
+    median_itl = [results[level]['Median ITL (ms)'] for level in concurrency_levels]
     
     # setup figure dimensions
     fig_size = (plot_dim[0] / 100, plot_dim[1] / 100) if plot_dim else (14, 10)
@@ -191,10 +200,10 @@ def plot_metrics_trellis_line_only(results: Dict[int, Dict[str, float]], save_pl
 
     # map each metric to its respective position in the grid
     metrics_data = { # type: ignore
-        'Output Token Throughput': {'values': output_token_throughput, 'color': 'red', 'axis': axes[0]},
-        'Median TTFT': {'values': median_ttft, 'color': 'blue', 'axis': axes[1]},
-        'Median TPOT': {'values': median_tpot, 'color': 'green', 'axis': axes[2]},
-        'Median ITL': {'values': median_itl, 'color': 'purple', 'axis': axes[3]}
+        'Output Token Throughput (tok/s)': {'values': output_token_throughput, 'color': 'red', 'axis': axes[0]},
+        'Median TTFT (ms)': {'values': median_ttft, 'color': 'blue', 'axis': axes[1]},
+        'Median TPOT (ms)': {'values': median_tpot, 'color': 'green', 'axis': axes[2]},
+        'Median ITL (ms)': {'values': median_itl, 'color': 'purple', 'axis': axes[3]}
     }
 
     # create line charts for each metric
@@ -214,13 +223,11 @@ def plot_metrics_trellis_line_only(results: Dict[int, Dict[str, float]], save_pl
 
     # setup layout
     plt.suptitle("Benchmark Metrics by Concurrency Level", fontsize=16) # type: ignore
+    plt.figtext(0.5, 0.95, generate_subtitle(args), ha='center', fontsize=10, color='gray') # type: ignore
     plt.tight_layout(rect=[0, 0.03, 1, 0.95]) # type: ignore
     
     if save_plot:
-        current_dir = os.getcwd()
-        save_path = f"{current_dir}/benchmark_metrics_trellis_line.{save_plot.lower()}"
-        print(f"Saving plot to: {save_path}")
-        plt.savefig(save_path, format=save_plot.lower(), dpi=100) # type: ignore
+        save_plot_to_file("trellis_line", save_plot)
     else:
         plt.show() # type: ignore
 
@@ -260,9 +267,9 @@ def main() -> None:
 
     # plot if required
     if args.save_plot:
-        plot_metrics(results, save_plot=args.save_plot, plot_dim=plot_dim)
-        plot_metrics_trellis(results, save_plot=args.save_plot, plot_dim=plot_dim)
-        plot_metrics_trellis_line_only(results, save_plot=args.save_plot, plot_dim=plot_dim)
+        plot_metrics(args, results, save_plot=args.save_plot, plot_dim=plot_dim)
+        plot_metrics_trellis(args, results, save_plot=args.save_plot, plot_dim=plot_dim)
+        plot_metrics_trellis_line_only(args, results, save_plot=args.save_plot, plot_dim=plot_dim)
 
 if __name__ == "__main__":
     main()
